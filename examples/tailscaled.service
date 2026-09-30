@@ -1,0 +1,21 @@
+[Unit]
+Description=Tailscale node agent for reMarkable
+Documentation=https://tailscale.com/docs/concepts/userspace-networking
+After=network.target
+RequiresMountsFor=/home/root/tailscale
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/home/root/tailscale/bin/tailscaled \
+    --state=/home/root/tailscale/state/tailscaled.state \
+    --statedir=/home/root/tailscale/state \
+    --socket=/run/tailscale/tailscaled.sock \
+    --tun=userspace-networking
+ExecStopPost=/home/root/tailscale/bin/tailscaled --cleanup
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=tailscale
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

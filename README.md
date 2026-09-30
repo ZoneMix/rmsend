@@ -49,8 +49,11 @@ restarts the tablet UI; save and close your current work before an SSH transfer.
    ```
 
 For wireless delivery, key-based SSH, custom hostnames, and troubleshooting,
-follow [the device setup guide](docs/setup.md). If you only want converted files,
-no tablet setup is necessary:
+follow [the device setup guide](docs/setup.md). The
+[Tailscale walkthrough](docs/tailscale.md) covers the maintainer's complete
+Wi-Fi setup, including installing ARM binaries on reMarkable 2, startup,
+Tailscale SSH permissions, and firmware-update recovery. If you only want
+converted files, no tablet setup is necessary:
 
 ```bash
 rmsend 'https://example.org/an-article' --dry-run --keep ./output

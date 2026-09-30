@@ -37,7 +37,9 @@ def find_chrome() -> str:
     for candidate in config.CHROME_CANDIDATES:
         if Path(candidate).is_file():
             return candidate
-    for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome"):
+    # Ubuntu's AppArmor profile supports the system Chrome installation; an
+    # unrelated Chromium build on PATH may lack a usable sandbox.
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"):
         found = shutil.which(name)
         if found:
             return found

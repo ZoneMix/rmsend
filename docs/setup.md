@@ -19,6 +19,11 @@ distribution, then install uv using its official instructions. The executable
 looks for Chrome/Chromium/Edge in their standard macOS application paths, then
 `chromium`, `chromium-browser`, `google-chrome`, `google-chrome-stable`, or `chrome`
 on PATH. PDF output requires a working graphical browser in headless mode.
+When both are installed, system Google Chrome is preferred. Some Ubuntu
+Chromium builds cannot start their sandbox under AppArmor's user-namespace
+restrictions. Install system Chrome or configure your distribution's supported
+Chromium sandbox; rmsend does not disable the sandbox. See the
+[Chromium explanation](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md).
 
 ## USB web interface: simplest route
 

@@ -5,6 +5,7 @@ permissions:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -22,3 +23,11 @@ jobs:
         run: RMSEND_PREFIX="$RUNNER_TEMP/rmsend-install" ./install.sh
       - name: Render the sample without a tablet
         run: ./rmsend examples/sample.html --dry-run --keep "$RUNNER_TEMP/rmsend-pdf"
+      - name: Browser diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          command -v chromium chromium-browser google-chrome google-chrome-stable chrome || true
+          if command -v google-chrome >/dev/null; then
+            google-chrome --headless=new --disable-gpu --no-first-run --user-data-dir="$RUNNER_TEMP/chrome-diagnostic" --dump-dom about:blank
+          fi

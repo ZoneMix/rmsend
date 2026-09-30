@@ -116,7 +116,8 @@ def print_html_to_pdf(page: Path, pdf: Path, workdir: Path) -> Path:
 
     if pdf_is_complete(pdf):
         return pdf
-    detail = (process.stderr.read() or b"").decode(errors="replace").strip()[-400:]
+    errors = (process.stderr.read() or b"").decode(errors="replace").strip()
+    detail = errors if len(errors) <= 1600 else errors[:1200] + "\n…\n" + errors[-400:]
     die(f"chrome produced no usable PDF: {detail or 'timed out'}")
 
 

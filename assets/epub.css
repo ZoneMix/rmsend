@@ -1,0 +1,79 @@
+/* EPUB stylesheet. reMarkable's reader overrides font, size, line spacing, margins
+ * and justification with the reader's own settings, so this only styles what it
+ * leaves alone: structure and spacing. Use print.css (PDF) for real typography. */
+
+blockquote {
+  margin: 1.2em 1.6em;
+  padding-left: 0.8em;
+  border-left: 2px solid #999;
+  font-style: italic;
+}
+
+blockquote p {
+  margin: 0.4em 0;
+}
+
+blockquote p.attribution {
+  font-style: normal;
+  font-size: 0.9em;
+}
+
+figure {
+  margin: 1.4em 0;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+figure img {
+  max-width: 100%;
+  height: auto;
+}
+
+figcaption {
+  margin-top: 0.4em;
+  font-size: 0.8em;
+  font-style: italic;
+}
+
+h1, h2, h3 {
+  margin-top: 1.6em;
+  page-break-after: avoid;
+}
+
+sup {
+  font-size: 0.7em;
+  vertical-align: super;
+  line-height: 0;
+}
+
+sup a {
+  text-decoration: none;
+}
+
+.endnotes {
+  margin-top: 2em;
+  font-size: 0.85em;
+}
+
+.endnotes p {
+  margin: 0.5em 0;
+  padding-left: 1.2em;
+  text-indent: -1.2em;
+}
+
+.source-note {
+  display: block;
+  margin: 0.5em 0 0.5em 1em;
+  font-size: 0.85em;
+}
+
+.source-credit {
+  margin-top: 1.6em;
+  font-size: 0.85em;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #bbb;
+  margin: 1.6em 0;
+}

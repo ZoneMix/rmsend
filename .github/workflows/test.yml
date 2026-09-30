@@ -1,0 +1,24 @@
+name: test
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
+      - name: Install Python
+        run: uv python install 3.11
+      - name: Offline tests
+        run: uv run --python 3.11 --with-requirements requirements-dev.txt python -m unittest discover -s tests
+      - name: Lint
+        run: uv run --with ruff==0.16.8 ruff check .
+      - name: Installer smoke test
+        run: RMSEND_PREFIX="$RUNNER_TEMP/rmsend-install" ./install.sh
+      - name: Render the sample without a tablet
+        run: ./rmsend examples/sample.html --dry-run --keep "$RUNNER_TEMP/rmsend-pdf"

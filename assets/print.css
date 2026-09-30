@@ -1,0 +1,237 @@
+/* Print stylesheet for reading long-form articles on a reMarkable 2.
+ *
+ * Three device facts drive every choice here:
+ *   1. The panel is 1404x1872 at 226 DPI, so the page is sized to it exactly and
+ *      nothing is ever scaled. Strokes below about 0.5pt disappear at this density,
+ *      so there are no hairlines.
+ *   2. It is grayscale with no backlight. True black on true white is the best
+ *      contrast available; tinted near-blacks only muddy it.
+ *   3. It is a writing surface. The wide right margin is an annotation column.
+ *
+ * Body text is 10.5pt, which puts the measure at roughly 68 characters.
+ */
+
+:root {
+  --ink: #000000;
+  --paper: #ffffff;
+  --ink-muted: #4a4a4a;
+  --rule: #b0b0b0;
+}
+
+@page {
+  /* 1404px / 226dpi = 157.8mm, 1872px / 226dpi = 210.4mm */
+  size: 157.8mm 210.4mm;
+  /* top | right (annotation column) | bottom | left */
+  margin: 16mm 22mm 18mm 14mm;
+}
+
+html {
+  font-size: 10.5pt;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  /* Charter was cut for coarse output devices; its sturdy serifs hold together
+   * at 226 DPI where finer transitional faces break up under dithering. */
+  font-family: Charter, "Charter BT", "Bitstream Charter", Georgia, serif;
+  font-size: 10.5pt;
+  line-height: 1.6;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- masthead ------------------------------------------------------------ */
+
+.masthead {
+  margin: 0 0 1.9rem;
+}
+
+.masthead h1 {
+  margin: 0 0 0.5rem;
+  font-size: 25pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+}
+
+.subtitle {
+  margin: 0 0 1.4rem;
+  font-size: 12.5pt;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.34;
+  color: var(--ink-muted);
+}
+
+.byline {
+  margin: 0;
+  font-size: 10pt;
+}
+
+.dateline {
+  margin: 0.12rem 0 0;
+  font-size: 9pt;
+  color: var(--ink-muted);
+}
+
+/* --- body ---------------------------------------------------------------- */
+
+article h2 {
+  margin: 2.1rem 0 0.55rem;
+  font-size: 14pt;
+  font-weight: 700;
+  line-height: 1.25;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+article h3 {
+  margin: 1.6rem 0 0.4rem;
+  font-size: 11.5pt;
+  font-weight: 700;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+article p {
+  margin: 0 0 0.8rem;
+  orphans: 3;
+  widows: 3;
+}
+
+article a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+em, i {
+  font-style: italic;
+}
+
+/* --- quotations ---------------------------------------------------------- */
+
+blockquote {
+  margin: 1.4rem 0 1.5rem 1rem;
+  padding-left: 1rem;
+  border-left: 2pt solid var(--ink);
+  font-style: italic;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+blockquote p {
+  margin: 0 0 0.4rem;
+}
+
+/* Attribution line: steps out of the italic so the quotation stays the voice. */
+blockquote p.attribution {
+  margin: 0.3rem 0 0;
+  font-size: 9.5pt;
+  font-style: normal;
+  color: var(--ink-muted);
+}
+
+/* --- figures ------------------------------------------------------------- */
+
+figure {
+  margin: 1.4rem 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Convert on the way in rather than leaving it to the panel's dithering. */
+  filter: grayscale(1) contrast(1.06);
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  font-size: 8.5pt;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* A caption is a whisper; its source links must not shout over the picture. */
+figcaption a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* --- rules --------------------------------------------------------------- */
+
+hr {
+  border: none;
+  border-top: 1pt solid var(--rule);
+  margin: 1.7rem 0;
+}
+
+/* --- notes --------------------------------------------------------------- */
+
+sup {
+  font-size: 0.62em;
+  line-height: 0;
+  vertical-align: super;
+}
+
+sup a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.endnotes {
+  break-before: page;
+  page-break-before: always;
+  margin-top: 0;
+  font-size: 8.5pt;
+  line-height: 1.45;
+}
+
+.endnotes h2 {
+  margin: 0 0 0.7rem;
+  font-size: 12pt;
+}
+
+.endnotes p {
+  margin: 0 0 0.4rem;
+  padding-left: 1.7em;
+  text-indent: -1.7em;
+  color: var(--ink-muted);
+}
+
+.endnotes a {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+/* Faith Received exports: source margin notes stay with their paragraph. */
+.source-note {
+  display: block;
+  margin: 0.4rem 0 0.4rem 1rem;
+  font-size: 8.5pt;
+  line-height: 1.4;
+}
+
+.source-credit {
+  margin-top: 1.6rem;
+  font-size: 8.5pt;
+}
+
+article table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+
+article th, article td {
+  padding: 0.3rem;
+  border: 1pt solid var(--rule);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}

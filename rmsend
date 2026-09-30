@@ -1,0 +1,177 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["trafilatura>=2.0,<3", "requests>=2.32,<3", "lxml>=5.0,<7", "markdown-it-py>=3,<5", "mdit-py-plugins>=0.4,<1"]
+# ///
+"""Send web articles or local documents to a reMarkable, no reMarkable software involved.
+
+URLs are reduced to the readable article, restructured for e-ink, then rendered either as a
+typeset PDF (Chrome, page sized to the panel) or a reflowable EPUB (pandoc). Local PDFs and
+EPUBs are sent unchanged; a local HTML file is printed exactly as written (it brings its own
+stylesheet — this is how the Daily Paper ships). Both transports are local: the tablet's web
+interface when it is switched on, otherwise SSH.
+
+This file is a thin shim: the code lives in rmsend_lib/ next to it, and ~/.local/bin/rmsend
+is a symlink here, so the tool is still one `uv run --script` invocation.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import replace
+import shutil
+import sys
+import tempfile
+import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from rmsend_lib import config  # noqa: E402
+from rmsend_lib.article import die, fetch_article, safe_stem  # noqa: E402
+from rmsend_lib.device import (  # noqa: E402
+    Outgoing, find_folder, list_documents, select_prunable, send_over_ssh,
+    send_over_web, ssh_is_up, web_interface_is_up,
+)
+from rmsend_lib.render import build_epub, build_pdf, html_title, print_html_to_pdf  # noqa: E402
+
+
+def resolve_source(target: str, fmt: str, workdir: Path, title: str, *, original: bool = False) -> Outgoing:
+    if target.startswith(("http://", "https://")):
+        article = fetch_article(target, workdir, original=original)
+        if title:
+            article = replace(article, title=title)
+        print(f"extracted: {article.title}")
+        stem = safe_stem(article.title)
+        document = (build_pdf(article, workdir, stem) if fmt == "pdf"
+                    else build_epub(article, target, workdir, stem))
+        return Outgoing(document, title or article.title)
+
+    local = Path(target).expanduser()
+    if not local.is_file():
+        die(f"{target} is neither a URL nor an existing file")
+    suffix = local.suffix.lower()
+    if suffix in config.HTML_SUFFIXES:
+        name = title or html_title(local)
+        pdf = print_html_to_pdf(local.resolve(), workdir / f"{safe_stem(name)}.pdf", workdir)
+        return Outgoing(pdf, name)
+    if suffix not in config.PASSTHROUGH_SUFFIXES:
+        die(f"{local.suffix or 'that file type'} is not readable on a reMarkable; "
+            "pass a PDF, EPUB, HTML file, or URL")
+    return Outgoing(local, title or local.stem)
+
+
+def choose_transport(requested: str) -> str:
+    if requested != "auto":
+        return requested
+    if web_interface_is_up():
+        return "web"
+    up, detail = ssh_is_up()
+    if up:
+        return "ssh"
+    hint = f"\n        ssh said: {detail}" if detail else ""
+    die(f"no reMarkable found. Connect it by USB, then either turn on\n"
+        f"        Settings > Storage > USB web interface, or make `ssh {config.SSH_HOST}` work.{hint}")
+
+
+def plan_folder(folder: str, keep_newest: int, title_prefix: str, incoming: int,
+                create: bool) -> tuple[str, tuple[str, ...], tuple[str, str] | None]:
+    """Resolve the folder id (optionally minting one) and, with --keep-newest, the older
+    same-titled docs to drop. Returns (folder_id, prune_ids, new_folder_or_None)."""
+    docs = list_documents()
+    folder_id = find_folder(docs, folder)
+    new_folder = None
+    if folder_id is None:
+        if not create:
+            die(f"no folder named {folder!r} on the tablet — create it once in the library "
+                f"(or pass --create-folder), then retry")
+        folder_id = str(uuid.uuid4())
+        new_folder = (folder, folder_id)
+    if keep_newest <= 0:
+        return folder_id, (), new_folder
+    return folder_id, select_prunable(docs, folder_id, keep_newest - incoming, title_prefix), new_folder
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="rmsend",
+        description="Send web articles or documents to a reMarkable, without reMarkable software.",
+    )
+    parser.add_argument("targets", nargs="+", metavar="target",
+                        help="article URL, or a local .pdf/.epub/.html (several = one restart)")
+    parser.add_argument("--format", choices=("pdf", "epub"), default="pdf",
+                        help="pdf keeps the typography, epub reflows to the reader's settings (default: pdf)")
+    parser.add_argument("--transport", choices=("auto", "web", "ssh"), default="auto",
+                        help="how to reach the tablet (default: auto)")
+    parser.add_argument("--title", default="",
+                        help="library name and URL document title for a single target")
+    parser.add_argument("--original", action="store_true",
+                        help="Mere Orthodoxy EEBO: keep original spelling instead of available modernized text")
+    parser.add_argument("--folder", default="",
+                        help="SSH transport: file the document(s) into this existing folder")
+    parser.add_argument("--create-folder", action="store_true",
+                        help="with --folder: mint the folder (CollectionType) if it does not exist yet")
+    parser.add_argument("--keep-newest", type=int, default=0, metavar="N",
+                        help="with --folder: afterwards keep only the N newest documents whose name "
+                             "starts with --title-prefix (default: the sent title's first word)")
+    parser.add_argument("--title-prefix", default="",
+                        help="name prefix that --keep-newest may prune (safety guard)")
+    parser.add_argument("--retention", choices=config.RETENTION_MODES, default="rm",
+                        help="how --keep-newest drops old documents: rm (default) or trash")
+    parser.add_argument("--keep", metavar="DIR", help="also save the converted file(s) here")
+    parser.add_argument("--dry-run", action="store_true", help="convert but do not send")
+    parser.add_argument("--no-restart", action="store_true",
+                        help="SSH transport: leave xochitl alone (documents appear after the next restart)")
+    args = parser.parse_args(argv)
+    if args.title and len(args.targets) > 1:
+        parser.error("--title applies to a single target")
+    if args.keep_newest and not args.folder:
+        parser.error("--keep-newest requires --folder")
+    if args.keep_newest < 0:
+        parser.error("--keep-newest must be zero or positive")
+    if args.create_folder and not args.folder:
+        parser.error("--create-folder requires --folder")
+    if (args.folder or args.keep_newest) and args.transport == "web":
+        parser.error("--folder/--keep-newest need the ssh transport")
+    return args
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
+    with tempfile.TemporaryDirectory(prefix="rmsend-") as tmp:
+        workdir = Path(tmp)
+        outgoing = tuple(
+            resolve_source(target, args.format, workdir / f"t{index}", args.title, original=args.original)
+            for index, target in enumerate(args.targets)
+            if (workdir / f"t{index}").mkdir() is None
+        )
+
+        if args.keep:
+            destination = Path(args.keep).expanduser()
+            destination.mkdir(parents=True, exist_ok=True)
+            for item in outgoing:
+                shutil.copy2(item.document, destination / item.document.name)
+                print(f"saved: {destination / item.document.name}")
+
+        if args.dry_run:
+            for item in outgoing:
+                print(f"dry run: {item.document.name} ({item.document.stat().st_size:,} bytes)")
+            return
+
+        transport = choose_transport("ssh" if args.folder else args.transport)
+        if transport == "web":
+            for item in outgoing:
+                send_over_web(item.document)
+            return
+
+        parent, prune_ids, new_folder = "", (), None
+        if args.folder:
+            prefix = args.title_prefix or outgoing[0].title.split(" ")[0]
+            parent, prune_ids, new_folder = plan_folder(args.folder, args.keep_newest, prefix,
+                                                        len(outgoing), args.create_folder)
+        send_over_ssh(outgoing, workdir, parent=parent, prune_ids=prune_ids,
+                      retention=args.retention, restart=not args.no_restart, new_folder=new_folder)
+
+
+if __name__ == "__main__":
+    main()
